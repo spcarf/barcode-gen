@@ -39,19 +39,29 @@
 
   /* ---------- Top bar ---------- */
   .topbar{
-    background:var(--card);
-    border-bottom:1px solid var(--line);
-    padding:14px 28px;
+    position:relative;
+    background:var(--navy);
+    padding:0 32px;
+    height:60px;
     display:flex;
     align-items:center;
-    justify-content:space-between;
-    gap:16px;
+    justify-content:flex-end;
   }
-  .topbar img{height:34px; width:auto; display:block;}
+  .logo-plate{
+    position:absolute;
+    top:0;
+    left:32px;
+    background:#ffffff;
+    border-radius:0 0 18px 18px;
+    padding:16px 28px 18px;
+    box-shadow:0 14px 30px -14px rgba(0,0,0,.45);
+    z-index:5;
+  }
+  .logo-plate img{height:70px; width:auto; display:block;}
   .domain-tag{
     font-family:'JetBrains Mono',monospace;
     font-size:12px;
-    color:var(--grey);
+    color:#c3cbe0;
     display:flex;
     align-items:center;
     gap:8px;
@@ -371,7 +381,9 @@
     .console-stage{padding:24px 22px;}
     .type-grid{grid-template-columns:repeat(2,1fr);}
     .section{padding:26px 22px;}
-    .topbar{padding:12px 20px;}
+    .topbar{padding:0 18px; height:52px;}
+    .logo-plate{left:18px; padding:12px 20px 14px;}
+    .logo-plate img{height:52px;}
     .domain-tag{display:none;}
   }
 </style>
@@ -379,7 +391,7 @@
 <body>
 
 <div class="topbar">
-  <img src="assets/rdl-logo.svg" alt="RD Life Sciences">
+  <div class="logo-plate"><img src="assets/rdl-logo.svg" alt="RD Life Sciences"></div>
   <span class="domain-tag"><span class="dot"></span>barcode.drprafulla.com</span>
 </div>
 
