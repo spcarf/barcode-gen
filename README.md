@@ -4,45 +4,55 @@ A premium barcode + QR generator for RD Life Sciences, deployed on Cloudflare
 Pages. Generates barcode images on the fly via a URL — designed to be called
 from Excel's `IMAGE()` function.
 
-Tested against the actual Cloudflare Workers runtime (`wrangler pages dev`):
-code128, ean13, qrcode, and datamatrix all confirmed producing valid PNGs, plus
-correct 400 handling for missing/invalid input.
+## Self-contained — no npm install needed at deploy time
+
+The barcode library (bwip-js) is pre-bundled into
+`functions/api/vendor-bwipjs.mjs` (a single minified file, ~256 KB gzipped).
+The function imports it with a relative path, so Cloudflare does NOT need to run
+`npm install` to build the Functions — this avoids the
+`Could not resolve "bwip-js"` build error that happens when Cloudflare skips the
+build step.
+
+Tested against the actual Cloudflare Workers runtime with bwip-js absent from
+node_modules: code128, ean13, qrcode, datamatrix all produce valid PNGs, and
+invalid input returns 400.
 
 ## What's inside
 
-- `functions/api/barcode.js` — a Cloudflare Pages Function. On each request it
-  renders a barcode with `bwip-js` and returns a PNG.
+- `functions/api/barcode.js` — the Cloudflare Pages Function (imports the
+  vendored bundle, renders a PNG per request).
+- `functions/api/vendor-bwipjs.mjs` — the pre-bundled barcode engine. Do not
+  edit by hand.
 - `public/index.html` — the branded landing page (RDL palette, logo, live
   preview, copy-ready Excel formula).
 - `public/assets/rdl-logo.svg` — the official RDL logo, used unmodified.
 
-## Deploy via GitHub + Cloudflare dashboard (no terminal needed)
+## Deploy via GitHub + Cloudflare dashboard (no terminal)
 
-Cloudflare's drag-and-drop upload does NOT support Pages Functions, so use the
-Git route:
-
-1. **Create a GitHub repo** — github.com → New repository → name it
-   `barcode-gen`, leave it empty (no README), Create.
+1. **Create a GitHub repo** — github.com → New repository → name `barcode-gen`,
+   leave it empty (no README), Create.
 2. **Upload the files** — on the empty repo, click "uploading an existing
    file". Unzip this project and drag the whole contents (`public/`,
    `functions/`, `package.json`, `wrangler.toml`, `README.md`, `.gitignore`)
-   into the box. GitHub preserves the folder structure. Commit changes.
-3. **Connect to Cloudflare Pages** — Cloudflare dashboard → Workers & Pages →
-   Create → Pages → Connect to Git → pick the `barcode-gen` repo.
+   into the box. Commit changes. Then confirm `functions/api/vendor-bwipjs.mjs`
+   and `functions/api/barcode.js` both appear at that path in the repo.
+3. **Connect to Cloudflare Pages** — dashboard → Workers & Pages → Create →
+   Pages → Connect to Git → pick `barcode-gen`.
    Build settings: Framework preset = None, Build command = blank,
    Build output directory = `public`. Save and Deploy.
-4. **Enable the compatibility flag** (easy to miss — the API errors without it):
-   project → Settings → Functions → Compatibility Flags → add `nodejs_compat`
-   to BOTH Production and Preview → Save. Then redeploy the latest deployment.
+   (Build command can stay blank now — the function needs no install.)
+4. **Enable the compatibility flag** — project → Settings → Functions →
+   Compatibility Flags → add `nodejs_compat` to BOTH Production and Preview →
+   Save → redeploy the latest deployment. (PNG encoding uses `node:zlib`, which
+   this flag provides. The API errors without it.)
 5. **Attach the domain** — project → Custom domains → Set up a custom domain →
    `barcode.drprafulla.com`. Since drprafulla.com is already on Cloudflare, the
-   CNAME is added automatically. Wait for the cert to go Active.
-6. **Test** — open
+   CNAME is added automatically. Wait for it to go Active.
+6. **Test** —
    `https://barcode.drprafulla.com/api/barcode?code=123456789012&type=code128`
-   — you should see a barcode image.
+   should return a barcode image.
 
-To update later, edit files directly in the GitHub web UI — Cloudflare
-auto-redeploys on every commit.
+To update later, edit files in the GitHub web UI — Cloudflare auto-redeploys.
 
 ## Use it in Excel (including Excel for the web)
 
@@ -72,18 +82,12 @@ Drag the fill handle down to barcode a whole column. For QR codes:
 | `includetext` | no | `true` | `false` hides the human-readable text |
 | `rotate` | no | `N` | N, R, L, I |
 
-## Local development
+## Rebuilding the vendored bundle (only if you upgrade bwip-js)
 
 ```
-npm install
-npm run dev
+npm install bwip-js
+npx esbuild node_modules/bwip-js/dist/bwip-js-node.mjs --bundle --minify \
+  --format=esm --platform=node \
+  --external:url --external:zlib --external:stream \
+  --outfile=functions/api/vendor-bwipjs.mjs
 ```
-
-## Implementation notes
-
-- Uses `bwip-js/node` — the build whose `toBuffer()` PNG encoder works in the
-  Workers runtime.
-- Requires `nodejs_compat` (set in `wrangler.toml`) — PNG encoding uses
-  `node:zlib`, polyfilled under that flag.
-- Images are served with a 1-year immutable cache header since the same
-  `code`+params always render the same image.

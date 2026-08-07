@@ -1,4 +1,4 @@
-import bwipjs from 'bwip-js/node';
+import bwipjs from './vendor-bwipjs.mjs';
 
 // Friendly aliases -> bwip-js symbology ids (bcid)
 const TYPE_ALIASES = {
