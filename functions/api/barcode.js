@@ -15,6 +15,15 @@ const TYPE_ALIASES = {
   pdf417: 'pdf417',
   code93: 'code93',
   codabar: 'rationalizedCodabar',
+  'gs1-128': 'gs1-128',
+  gs1128: 'gs1-128',
+  'ucc-128': 'gs1-128',
+  'ean-128': 'gs1-128',
+  gs1datamatrix: 'gs1datamatrix',
+  'gs1-datamatrix': 'gs1datamatrix',
+  gs1qrcode: 'gs1qrcode',
+  'gs1-qrcode': 'gs1qrcode',
+  gs1qr: 'gs1qrcode',
 };
 
 export async function onRequestGet({ request }) {

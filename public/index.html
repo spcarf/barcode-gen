@@ -40,28 +40,29 @@
   /* ---------- Top bar ---------- */
   .topbar{
     position:relative;
-    background:var(--navy);
+    background:#ffffff;
     padding:0 32px;
-    height:60px;
+    height:58px;
     display:flex;
     align-items:center;
     justify-content:flex-end;
+    z-index:6;
   }
   .logo-plate{
     position:absolute;
     top:0;
-    left:32px;
+    left:24px;
     background:#ffffff;
     border-radius:0 0 18px 18px;
-    padding:16px 28px 18px;
-    box-shadow:0 14px 30px -14px rgba(0,0,0,.45);
+    padding:15px 28px 18px;
+    box-shadow:0 22px 44px -22px rgba(8,29,69,.55);
     z-index:5;
   }
   .logo-plate img{height:70px; width:auto; display:block;}
   .domain-tag{
     font-family:'JetBrains Mono',monospace;
     font-size:12px;
-    color:#c3cbe0;
+    color:var(--grey);
     display:flex;
     align-items:center;
     gap:8px;
@@ -199,6 +200,17 @@
   }
   .ctrl select option{color:#1a1a1a;}
   .ctrl-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .gs1-note{
+    display:none;
+    margin:9px 0 0;
+    font-size:11.5px;
+    line-height:1.5;
+    color:rgba(255,255,255,.6);
+  }
+  .gs1-note span{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--gold);
+  }
 
   /* Preview stage */
   .console-stage{
@@ -381,8 +393,8 @@
     .console-stage{padding:24px 22px;}
     .type-grid{grid-template-columns:repeat(2,1fr);}
     .section{padding:26px 22px;}
-    .topbar{padding:0 18px; height:52px;}
-    .logo-plate{left:18px; padding:12px 20px 14px;}
+    .topbar{padding:0 16px; height:50px;}
+    .logo-plate{left:14px; padding:11px 20px 13px;}
     .logo-plate img{height:52px;}
     .domain-tag{display:none;}
   }
@@ -422,16 +434,22 @@
       <div class="ctrl">
         <label for="code">Code / text</label>
         <input id="code" type="text" value="123456789012" placeholder="Enter value to encode">
+        <p id="gs1-note" class="gs1-note">Use GS1 Application Identifiers in parentheses, e.g. <span>(01)</span> GTIN, <span>(17)</span> expiry, <span>(10)</span> batch.</p>
       </div>
       <div class="ctrl">
         <label for="type">Symbology</label>
         <select id="type">
           <option value="code128">Code 128</option>
+          <option value="gs1-128">GS1-128 (UCC/EAN-128)</option>
           <option value="ean13">EAN-13</option>
           <option value="upca">UPC-A</option>
           <option value="code39">Code 39</option>
+          <option value="itf14">ITF-14</option>
           <option value="qrcode">QR code</option>
+          <option value="gs1qrcode">GS1 QR code</option>
           <option value="datamatrix">Data Matrix</option>
+          <option value="gs1datamatrix">GS1 Data Matrix</option>
+          <option value="pdf417">PDF417</option>
         </select>
       </div>
       <div class="ctrl-row">
@@ -485,14 +503,17 @@
     <p>Pass any of these as the <code>type</code> parameter in the URL.</p>
     <div class="type-grid">
       <div class="type-chip">code128</div>
+      <div class="type-chip">gs1-128</div>
       <div class="type-chip">ean13</div>
       <div class="type-chip">upca</div>
       <div class="type-chip">code39</div>
+      <div class="type-chip">itf14</div>
       <div class="type-chip">qrcode</div>
+      <div class="type-chip">gs1qrcode</div>
       <div class="type-chip">datamatrix</div>
+      <div class="type-chip">gs1datamatrix</div>
       <div class="type-chip">pdf417</div>
       <div class="type-chip">ean8</div>
-      <div class="type-chip">upce</div>
     </div>
   </div>
 
@@ -521,6 +542,23 @@
 </footer>
 
 <script>
+  // A valid sample per symbology, so switching type always previews cleanly.
+  var EXAMPLES = {
+    'code128': '123456789012',
+    'gs1-128': '(01)09501101020917(17)210630(10)ABC123',
+    'ean13': '590123412345',
+    'upca': '01234567890',
+    'code39': 'RDL-12345',
+    'itf14': '1540014128876',
+    'qrcode': 'https://barcode.drprafulla.com',
+    'gs1qrcode': '(01)09501101020917(10)ABC123',
+    'datamatrix': 'RDL-ABC-123',
+    'gs1datamatrix': '(01)09501101020917(17)210630(10)ABC123',
+    'pdf417': 'RD Life Sciences'
+  };
+  // Types that use GS1 Application Identifiers in parentheses.
+  var GS1_TYPES = { 'gs1-128':1, 'gs1qrcode':1, 'gs1datamatrix':1 };
+
   function currentUrl(){
     const code   = document.getElementById('code').value;
     const type   = document.getElementById('type').value;
@@ -540,6 +578,17 @@
       '<span class="fn">=IMAGE</span>(<span class="str">"' + location.origin +
       '/api/barcode?code="</span><span class="amp">&amp;</span>A2<span class="amp">&amp;</span><span class="str">"&amp;type=' +
       type + '"</span>)';
+
+    // Show a GS1 note only for GS1 symbologies.
+    var note = document.getElementById('gs1-note');
+    if (note) note.style.display = GS1_TYPES[type] ? 'block' : 'none';
+  }
+
+  // When the symbology changes, drop in a valid example for that type.
+  function onTypeChange(){
+    var type = document.getElementById('type').value;
+    if (EXAMPLES[type]) document.getElementById('code').value = EXAMPLES[type];
+    update();
   }
 
   function flashCopied(btn){
@@ -549,10 +598,10 @@
     setTimeout(function(){ btn.textContent = original; btn.classList.remove('copied'); }, 1400);
   }
 
-  ['code','type','scale','height'].forEach(function(id){
-    const ev = (id === 'type') ? 'change' : 'input';
-    document.getElementById(id).addEventListener(ev, update);
-  });
+  document.getElementById('code').addEventListener('input', update);
+  document.getElementById('scale').addEventListener('input', update);
+  document.getElementById('height').addEventListener('input', update);
+  document.getElementById('type').addEventListener('change', onTypeChange);
 
   document.getElementById('copyUrl').addEventListener('click', function(){
     navigator.clipboard.writeText(currentUrl());
