@@ -1,0 +1,4 @@
+name = "barcode-gen"
+pages_build_output_dir = "public"
+compatibility_date = "2026-08-07"
+compatibility_flags = ["nodejs_compat"]

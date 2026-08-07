@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prafulla's Barcode Generator</title>
+<meta name="description" content="Precision barcode and QR generation by URL — built for Excel's IMAGE() function. RD Life Sciences.">
+<link rel="icon" type="image/svg+xml" href="assets/rdl-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Open+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-900:#081d45;
+    --navy:#0d2a61;
+    --blue:#133c8b;
+    --blue-300:#5b7fc0;
+    --green:#72bf44;
+    --gold:#f0a500;
+    --grey:#6d6e71;
+    --ink:#231f20;
+    --paper:#f4f6fa;
+    --card:#ffffff;
+    --line:#e5e8f0;
+    --line-soft:#eef1f6;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Open Sans',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  .mont{font-family:'Montserrat',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+    padding:14px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+  }
+  .topbar img{height:34px; width:auto; display:block;}
+  .domain-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--grey);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .domain-tag .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 0 0 rgba(114,191,68,.6);
+    animation:pulse 2.4s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(114,191,68,.5);}
+    70%{box-shadow:0 0 0 7px rgba(114,191,68,0);}
+    100%{box-shadow:0 0 0 0 rgba(114,191,68,0);}
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    position:relative;
+    background:var(--navy);
+    background-image:linear-gradient(160deg,var(--navy) 0%,var(--navy-900) 100%);
+    color:#eaf0fb;
+    padding:64px 28px 132px;
+    text-align:center;
+    overflow:hidden;
+  }
+  .hex-field{position:absolute; inset:0; opacity:.5; pointer-events:none;}
+  .hero-inner{position:relative; z-index:2; max-width:720px; margin:0 auto;}
+  .eyebrow{
+    display:inline-block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:.32em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin:0 0 18px;
+    padding-left:.32em;
+  }
+  h1{
+    font-family:'Montserrat',sans-serif;
+    font-weight:800;
+    font-size:clamp(30px,5vw,52px);
+    line-height:1.08;
+    letter-spacing:-.015em;
+    margin:0 0 18px;
+  }
+  h1 .accent{color:var(--gold);}
+  .hero-sub{
+    max-width:500px;
+    margin:0 auto;
+    color:#aeb9d6;
+    font-size:16px;
+    line-height:1.65;
+  }
+  .hero-sub code{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13.5px;
+    background:rgba(240,165,0,.14);
+    color:#f6c65f;
+    padding:2px 7px;
+    border-radius:5px;
+  }
+
+  /* ---------- Layout ---------- */
+  .wrap{max-width:920px; margin:0 auto; padding:0 24px 80px;}
+
+  /* ---------- Console (signature element) ---------- */
+  .console{
+    margin-top:-92px;
+    position:relative;
+    z-index:3;
+    background:var(--card);
+    border-radius:20px;
+    border:1px solid var(--line);
+    box-shadow:0 40px 80px -40px rgba(8,29,69,.55);
+    overflow:hidden;
+    display:grid;
+    grid-template-columns:340px minmax(0,1fr);
+  }
+
+  .console-controls{
+    background:var(--navy);
+    background-image:linear-gradient(180deg,var(--navy) 0%,#0b2456 100%);
+    padding:30px 28px;
+    color:#eaf0fb;
+  }
+  .panel-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--blue-300);
+    margin:0 0 22px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .panel-tag::before{
+    content:"";width:16px;height:1px;background:var(--gold);display:inline-block;
+  }
+  .ctrl{margin-bottom:20px;}
+  .ctrl:last-child{margin-bottom:0;}
+  .ctrl label{
+    display:block;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.55);
+    margin-bottom:8px;
+  }
+  .ctrl input, .ctrl select{
+    width:100%;
+    padding:11px 13px;
+    font-size:14.5px;
+    font-family:'Open Sans',sans-serif;
+    color:#fff;
+    background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:10px;
+    outline:none;
+    transition:border-color .16s ease, background .16s ease;
+  }
+  .ctrl input::placeholder{color:rgba(255,255,255,.4);}
+  .ctrl input:focus, .ctrl select:focus{
+    border-color:var(--gold);
+    background:rgba(255,255,255,.1);
+  }
+  .ctrl select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f0a500' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 13px center;
+    padding-right:34px;
+    cursor:pointer;
+  }
+  .ctrl select option{color:#1a1a1a;}
+  .ctrl-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+
+  /* Preview stage */
+  .console-stage{
+    padding:30px 30px 26px;
+    background:
+      radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0 / 22px 22px,
+      var(--card);
+    display:flex;
+    flex-direction:column;
+  }
+  .stage-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .stage-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--grey);
+  }
+  .live{
+    display:flex; align-items:center; gap:7px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--green);
+    text-transform:uppercase; letter-spacing:.1em;
+  }
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite;}
+  .preview-box{
+    flex:1;
+    min-width:0;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    padding:26px 20px;
+    min-height:150px;
+    overflow:hidden;
+  }
+  .preview-box img{max-width:100%; height:auto; display:block;}
+
+  .url-strip{margin-top:16px;}
+  .url-strip .lbl{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--grey); margin-bottom:7px; display:block;
+  }
+  .url-row{display:flex; gap:8px;}
+  .url-box{
+    flex:1;
+    min-width:0;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--blue);
+    background:var(--line-soft);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:10px 12px;
+    overflow-x:auto; white-space:nowrap;
+    scrollbar-width:thin;
+  }
+  button.copy{
+    flex-shrink:0;
+    border:1px solid var(--line);
+    background:var(--card);
+    color:var(--grey);
+    border-radius:9px;
+    padding:0 15px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px; font-weight:500;
+    text-transform:uppercase; letter-spacing:.06em;
+    cursor:pointer;
+    transition:all .16s ease;
+  }
+  button.copy:hover{border-color:var(--blue); color:var(--blue);}
+  button.copy.copied{border-color:var(--green); color:var(--green); background:rgba(114,191,68,.08);}
+
+  /* ---------- Section cards ---------- */
+  .section{
+    margin-top:22px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:32px;
+  }
+  .section-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--gold); margin:0 0 6px;
+  }
+  .section h2{
+    font-family:'Montserrat',sans-serif;
+    font-size:20px; font-weight:700; color:var(--navy);
+    margin:0 0 10px; letter-spacing:-.01em;
+  }
+  .section p{font-size:14.5px; color:var(--grey); line-height:1.65; margin:0 0 20px;}
+  .section p code{
+    font-family:'JetBrains Mono',monospace; font-size:12.5px;
+    background:var(--line-soft); color:var(--blue);
+    padding:2px 6px; border-radius:5px;
+  }
+
+  .formula-box{display:flex; gap:8px; align-items:stretch;}
+  .formula{
+    flex:1;
+    min-width:0;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px; line-height:1.6;
+    background:var(--navy);
+    color:#e3e8f5;
+    border-radius:11px;
+    padding:18px 20px;
+    overflow-x:auto; white-space:pre;
+  }
+  .formula .fn{color:var(--gold);}
+  .formula .str{color:#8fd0ff;}
+  .formula .amp{color:var(--green);}
+
+  .hint{
+    margin-top:16px; padding:14px 16px;
+    background:rgba(240,165,0,.07);
+    border:1px solid rgba(240,165,0,.25);
+    border-radius:10px;
+    font-size:13px; color:#8a6410; line-height:1.55;
+  }
+  .hint strong{color:#6f4f08;}
+
+  .type-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .type-chip{
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    color:var(--blue);
+    background:var(--line-soft);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:11px 12px; text-align:center;
+    transition:all .16s ease;
+  }
+  .type-chip:hover{border-color:var(--blue); background:#eaf0fb;}
+
+  /* ---------- Steps ---------- */
+  .steps{list-style:none; margin:0; padding:0; counter-reset:step;}
+  .steps li{
+    counter-increment:step;
+    position:relative;
+    padding:0 0 20px 46px;
+    margin:0;
+  }
+  .steps li:last-child{padding-bottom:0;}
+  .steps li::before{
+    content:counter(step);
+    position:absolute; left:0; top:-2px;
+    width:30px; height:30px; border-radius:9px;
+    background:var(--navy); color:#fff;
+    font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .steps li::after{
+    content:""; position:absolute; left:14px; top:32px; bottom:6px;
+    width:1px; background:var(--line);
+  }
+  .steps li:last-child::after{display:none;}
+  .steps .st-title{font-weight:600; color:var(--ink); font-size:14.5px; margin-bottom:3px;}
+  .steps .st-body{font-size:13.5px; color:var(--grey); line-height:1.6;}
+  .steps code{
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    background:var(--line-soft); color:var(--blue); padding:1px 5px; border-radius:4px;
+  }
+
+  /* ---------- Footer ---------- */
+  footer{
+    text-align:center;
+    padding:32px 24px 48px;
+    color:var(--grey);
+    font-size:12.5px;
+    line-height:1.7;
+  }
+  footer .brand{color:var(--blue); font-weight:600;}
+  footer .div{color:var(--line); margin:0 8px;}
+
+  @media (max-width:720px){
+    .console{grid-template-columns:minmax(0,1fr); margin-top:-72px;}
+    .console-controls{padding:26px 22px;}
+    .console-stage{padding:24px 22px;}
+    .type-grid{grid-template-columns:repeat(2,1fr);}
+    .section{padding:26px 22px;}
+    .topbar{padding:12px 20px;}
+    .domain-tag{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="assets/rdl-logo.svg" alt="RD Life Sciences">
+  <span class="domain-tag"><span class="dot"></span>barcode.drprafulla.com</span>
+</div>
+
+<div class="hero">
+  <svg class="hex-field" viewBox="0 0 720 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <pattern id="hex" width="56" height="48" patternUnits="userSpaceOnUse" patternTransform="scale(1.4)">
+        <path d="M14 1 L28 9 L28 25 L14 33 L0 25 L0 9 Z" fill="none" stroke="#3a5fa8" stroke-opacity="0.22" stroke-width="1"/>
+        <path d="M42 25 L56 33 L56 49 L42 57 L28 49 L28 33 Z" fill="none" stroke="#3a5fa8" stroke-opacity="0.22" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="720" height="300" fill="url(#hex)"/>
+  </svg>
+
+  <div class="hero-inner">
+    <span class="eyebrow">Precision barcode tooling</span>
+    <h1 class="mont">Prafulla&rsquo;s <span class="accent">Barcode</span> Generator</h1>
+    <p class="hero-sub">Turn any value into a scannable barcode or QR image by URL &mdash; then pull it straight into Excel with <code>IMAGE()</code>. No add-ins, no downloads.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Console -->
+  <div class="console">
+    <div class="console-controls">
+      <p class="panel-tag">Configure</p>
+      <div class="ctrl">
+        <label for="code">Code / text</label>
+        <input id="code" type="text" value="123456789012" placeholder="Enter value to encode">
+      </div>
+      <div class="ctrl">
+        <label for="type">Symbology</label>
+        <select id="type">
+          <option value="code128">Code 128</option>
+          <option value="ean13">EAN-13</option>
+          <option value="upca">UPC-A</option>
+          <option value="code39">Code 39</option>
+          <option value="qrcode">QR code</option>
+          <option value="datamatrix">Data Matrix</option>
+        </select>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl">
+          <label for="scale">Scale</label>
+          <input id="scale" type="number" value="3" min="1" max="10">
+        </div>
+        <div class="ctrl">
+          <label for="height">Height</label>
+          <input id="height" type="number" value="10" min="1" max="60">
+        </div>
+      </div>
+    </div>
+
+    <div class="console-stage">
+      <div class="stage-head">
+        <span class="stage-tag">Preview</span>
+        <span class="live"><span class="dot"></span>Live</span>
+      </div>
+      <div class="preview-box">
+        <img id="img" alt="Barcode preview">
+      </div>
+      <div class="url-strip">
+        <span class="lbl">Image URL</span>
+        <div class="url-row">
+          <div class="url-box" id="urlbox"></div>
+          <button class="copy" id="copyUrl">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Excel -->
+  <div class="section">
+    <p class="section-tag">Integration</p>
+    <h2>Use it in Excel</h2>
+    <p>Paste this into any cell, where <code>A2</code> holds the value you want encoded. Drag the fill handle down to barcode an entire column.</p>
+    <div class="formula-box">
+      <div class="formula" id="formulaText"></div>
+      <button class="copy" id="copyFormula">Copy</button>
+    </div>
+    <div class="hint">
+      <strong>Tip:</strong> Excel&rsquo;s <code style="background:rgba(240,165,0,.12)">IMAGE()</code> supports PNG, JPEG, GIF, BMP and more &mdash; but not SVG. This tool outputs PNG, so it works everywhere, including Excel for the web.
+    </div>
+  </div>
+
+  <!-- Symbologies -->
+  <div class="section">
+    <p class="section-tag">Reference</p>
+    <h2>Supported symbologies</h2>
+    <p>Pass any of these as the <code>type</code> parameter in the URL.</p>
+    <div class="type-grid">
+      <div class="type-chip">code128</div>
+      <div class="type-chip">ean13</div>
+      <div class="type-chip">upca</div>
+      <div class="type-chip">code39</div>
+      <div class="type-chip">qrcode</div>
+      <div class="type-chip">datamatrix</div>
+      <div class="type-chip">pdf417</div>
+      <div class="type-chip">ean8</div>
+      <div class="type-chip">upce</div>
+    </div>
+  </div>
+
+  <!-- Parameters -->
+  <div class="section">
+    <p class="section-tag">API</p>
+    <h2>URL parameters</h2>
+    <p>The endpoint lives at <code>/api/barcode</code>. Only <code>code</code> is required.</p>
+    <ul class="steps">
+      <li><div class="st-title">code</div><div class="st-body">The text or number to encode. Required.</div></li>
+      <li><div class="st-title">type</div><div class="st-body">Symbology name (default <code>code128</code>).</div></li>
+      <li><div class="st-title">scale</div><div class="st-body">Image resolution, 1&ndash;10 (default <code>3</code>).</div></li>
+      <li><div class="st-title">height</div><div class="st-body">Bar height for linear barcodes (default <code>10</code>).</div></li>
+      <li><div class="st-title">includetext</div><div class="st-body">Set <code>false</code> to hide the human-readable text.</div></li>
+    </ul>
+  </div>
+
+</div>
+
+<footer>
+  Built by <span class="brand">Prafulla Kumar</span>
+  <span class="div">&middot;</span>
+  RD Life Sciences
+  <span class="div">&middot;</span>
+  Advancing Animal Health &amp; Productivity
+</footer>
+
+<script>
+  function currentUrl(){
+    const code   = document.getElementById('code').value;
+    const type   = document.getElementById('type').value;
+    const scale  = document.getElementById('scale').value;
+    const height = document.getElementById('height').value;
+    return location.origin + '/api/barcode?code=' + encodeURIComponent(code)
+         + '&type=' + type + '&scale=' + scale + '&height=' + height;
+  }
+
+  function update(){
+    const url = currentUrl();
+    document.getElementById('img').src = url;
+    document.getElementById('urlbox').textContent = url;
+
+    const type = document.getElementById('type').value;
+    document.getElementById('formulaText').innerHTML =
+      '<span class="fn">=IMAGE</span>(<span class="str">"' + location.origin +
+      '/api/barcode?code="</span><span class="amp">&amp;</span>A2<span class="amp">&amp;</span><span class="str">"&amp;type=' +
+      type + '"</span>)';
+  }
+
+  function flashCopied(btn){
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = original; btn.classList.remove('copied'); }, 1400);
+  }
+
+  ['code','type','scale','height'].forEach(function(id){
+    const ev = (id === 'type') ? 'change' : 'input';
+    document.getElementById(id).addEventListener(ev, update);
+  });
+
+  document.getElementById('copyUrl').addEventListener('click', function(){
+    navigator.clipboard.writeText(currentUrl());
+    flashCopied(this);
+  });
+  document.getElementById('copyFormula').addEventListener('click', function(){
+    const type = document.getElementById('type').value;
+    const formula = '=IMAGE("' + location.origin + '/api/barcode?code="&A2&"&type=' + type + '")';
+    navigator.clipboard.writeText(formula);
+    flashCopied(this);
+  });
+
+  update();
+</script>
+</body>
+</html>
