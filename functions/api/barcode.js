@@ -24,6 +24,12 @@ const TYPE_ALIASES = {
   gs1qrcode: 'gs1qrcode',
   'gs1-qrcode': 'gs1qrcode',
   gs1qr: 'gs1qrcode',
+  databarexpanded: 'databarexpanded',
+  'databar-expanded': 'databarexpanded',
+  'gs1-databar-expanded': 'databarexpanded',
+  gs1databarexpanded: 'databarexpanded',
+  databarexpandedstacked: 'databarexpandedstacked',
+  'databar-expanded-stacked': 'databarexpandedstacked',
 };
 
 export async function onRequestGet({ request }) {

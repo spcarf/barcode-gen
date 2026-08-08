@@ -441,6 +441,7 @@
         <select id="type">
           <option value="code128">Code 128</option>
           <option value="gs1-128">GS1-128 (UCC/EAN-128)</option>
+          <option value="databarexpanded">GS1 DataBar Expanded</option>
           <option value="ean13">EAN-13</option>
           <option value="upca">UPC-A</option>
           <option value="code39">Code 39</option>
@@ -504,6 +505,7 @@
     <div class="type-grid">
       <div class="type-chip">code128</div>
       <div class="type-chip">gs1-128</div>
+      <div class="type-chip">databarexpanded</div>
       <div class="type-chip">ean13</div>
       <div class="type-chip">upca</div>
       <div class="type-chip">code39</div>
@@ -546,6 +548,7 @@
   var EXAMPLES = {
     'code128': '123456789012',
     'gs1-128': '(01)09501101020917(17)210630(10)ABC123',
+    'databarexpanded': '(01)03701001001474(15)290623(10)26174',
     'ean13': '590123412345',
     'upca': '01234567890',
     'code39': 'RDL-12345',
@@ -557,7 +560,7 @@
     'pdf417': 'RD Life Sciences'
   };
   // Types that use GS1 Application Identifiers in parentheses.
-  var GS1_TYPES = { 'gs1-128':1, 'gs1qrcode':1, 'gs1datamatrix':1 };
+  var GS1_TYPES = { 'gs1-128':1, 'gs1qrcode':1, 'gs1datamatrix':1, 'databarexpanded':1 };
 
   function currentUrl(){
     const code   = document.getElementById('code').value;

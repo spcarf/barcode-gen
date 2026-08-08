@@ -290,96 +290,93 @@ function beep(){ try{
 }catch(e){} }
 
 /* ---------- camera + detection ----------
-   Primary engine: ZXing (same engine class as Binary Eye) for accurate,
-   consistent decoding of GS1-128 / Code 128 without the native ML Kit
-   misreads. Native BarcodeDetector is used only if ZXing can't load.
+   Primary engine: zxing-wasm (ZXing compiled to WebAssembly) via the
+   barcode-detector polyfill. This is the SAME C++ engine class that Binary
+   Eye uses, and it reads GS1 DataBar / DataBar Expanded reliably and fast --
+   which the phone's native detector and pure-JS ZXing cannot do well.
+   Native BarcodeDetector is only a fallback for common 1D/2D codes.
 */
 var video=document.getElementById('video');
-var running=false, captured=false, zxingReader=null, zxingControls=null, track=null, detector=null, rafId=0;
+var running=false, captured=false, track=null, detector=null, rafId=0, BDClass=null;
 
 function isContinuous(){ return document.getElementById('continuous').checked; }
+
+/* Load the WASM-backed BarcodeDetector polyfill (tries two CDNs). */
+async function ensureEngine(){
+  if (BDClass) return true;
+  var urls=[
+    'https://cdn.jsdelivr.net/npm/barcode-detector@2/+esm',
+    'https://unpkg.com/barcode-detector@2/dist/es/pure.min.js',
+    'https://cdn.jsdelivr.net/npm/barcode-detector/+esm'
+  ];
+  for (var i=0;i<urls.length;i++){
+    try{
+      var m = await import(urls[i]);
+      var BD = m.BarcodeDetector || (m.default && m.default.BarcodeDetector);
+      if (BD){ BDClass = BD; return true; }
+    }catch(e){ /* try next */ }
+  }
+  return false;
+}
+
+async function openCamera(){
+  var strm=await navigator.mediaDevices.getUserMedia({
+    video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }
+  });
+  video.setAttribute('playsinline','true'); video.srcObject=strm; await video.play();
+  track=strm.getVideoTracks()[0];
+  try{ var fc=track.applyConstraints({advanced:[{focusMode:'continuous'}]}); if(fc&&fc.catch) fc.catch(function(){}); }catch(e){}
+  setupZoom(); setupTorch();
+}
 
 async function startCamera(){
   captured=false;
   showLive(true);
   setStatus('Loading scanner\u2026');
-  var ok = await ensureZxing();
-  if (ok){ await startZxing(); return; }
-  // Fallback: native BarcodeDetector
-  if ('BarcodeDetector' in window){ await startNative(); return; }
-  setStatus('Could not load the scanner. Check your connection and retry.');
-  showLive(false);
+  var haveWasm = await ensureEngine();
+  try{ await openCamera(); }catch(err){ onCamError(err); return; }
+  running=true;
+
+  var want=['code_128','code_39','code_93','codabar','itf','ean_13','ean_8','upc_a','upc_e',
+            'qr_code','data_matrix','pdf417','aztec','databar','databar_expanded'];
+
+  if (haveWasm){
+    try{
+      var supported=null; try{ supported=await BDClass.getSupportedFormats(); }catch(e){}
+      var use = supported ? want.filter(function(f){ return supported.indexOf(f)>=0; }) : want;
+      detector = new BDClass({ formats: use });
+      setStatus('Scanning\u2026 point at a barcode');
+      loopDetect();
+      return;
+    }catch(e){ /* fall through to native */ }
+  }
+
+  if ('BarcodeDetector' in window){
+    try{
+      var nf=null; try{ nf=await window.BarcodeDetector.getSupportedFormats(); }catch(e){}
+      var nuse = nf ? want.filter(function(f){ return nf.indexOf(f)>=0; }) : want;
+      detector = new window.BarcodeDetector({ formats: nuse });
+      setStatus('Scanning\u2026 (basic engine \u2014 DataBar needs the full engine)');
+      loopDetect();
+      return;
+    }catch(e){}
+  }
+
+  setStatus('Could not load the scanner engine. Check your connection and retry.');
+  stopCamera();
 }
 
-/* ZXing loader */
-function ensureZxing(){
-  return new Promise(function(resolve){
-    if (typeof ZXing !== 'undefined'){ resolve(true); return; }
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
-    s.onload=function(){ resolve(typeof ZXing !== 'undefined'); };
-    s.onerror=function(){ resolve(false); };
-    document.head.appendChild(s);
-  });
-}
-
-async function startZxing(){
-  try{
-    var hints=new Map();
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    var F=ZXing.BarcodeFormat;
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
-      F.QR_CODE,F.DATA_MATRIX,F.AZTEC,F.PDF_417,
-      F.CODE_128,F.CODE_39,F.CODE_93,F.CODABAR,F.ITF,
-      F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.RSS_14,F.RSS_EXPANDED
-    ]);
-    zxingReader=new ZXing.BrowserMultiFormatReader(hints);
-    running=true;
-    video.setAttribute('playsinline','true');
-    zxingControls = await zxingReader.decodeFromConstraints(
-      { video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} } },
-      video,
-      function(result){
-        if(result && !captured){
-          if(!isContinuous()) captured=true;
-          var fmt='barcode'; try{ fmt=ZXing.BarcodeFormat[result.getBarcodeFormat()]||'barcode'; }catch(e){}
-          addScan(result.getText(), fmtName(fmt));
-          if(!isContinuous()) stopCamera();
-        }
-      }
-    );
-    try{ track=(video.srcObject&&video.srcObject.getVideoTracks)?video.srcObject.getVideoTracks()[0]:null; }catch(e){ track=null; }
-    setupZoom(); setupTorch();
-    if(running) setStatus('Scanning\u2026 point at a barcode');
-  }catch(err){ onCamError(err); }
-}
-
-/* Native fallback */
-async function startNative(){
-  try{
-    var strm=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} } });
-    video.setAttribute('playsinline','true'); video.srcObject=strm; await video.play();
-    track=strm.getVideoTracks()[0];
-    try{ track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
-    var fmts=null; try{ fmts=await window.BarcodeDetector.getSupportedFormats(); }catch(e){}
-    var want=['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','data_matrix','itf','code_39','code_93','pdf417','codabar','aztec'];
-    detector=new window.BarcodeDetector({ formats: fmts?want.filter(function(f){return fmts.indexOf(f)>=0;}):want });
-    running=true; setupZoom(); setupTorch();
-    setStatus('Scanning\u2026 point at a barcode');
-    loopNative();
-  }catch(err){ onCamError(err); }
-}
-async function loopNative(){
+async function loopDetect(){
   if(!running) return;
   try{
-    var codes=await detector.detect(video);
-    if(codes && codes.length && !captured){
+    var codes = await detector.detect(video);
+    if (codes && codes.length && !captured){
       if(!isContinuous()) captured=true;
       addScan(codes[0].rawValue, fmtName(codes[0].format));
       if(!isContinuous()){ stopCamera(); return; }
     }
   }catch(e){}
-  rafId=requestAnimationFrame(loopNative);
+  rafId = setTimeout(function(){ requestAnimationFrame(loopDetect); }, 60);
 }
 
 function onCamError(err){
@@ -403,10 +400,8 @@ function showLive(on){
 
 function stopCamera(){
   running=false;
-  if(rafId){ cancelAnimationFrame(rafId); rafId=0; }
-  try{ if(zxingControls&&zxingControls.stop) zxingControls.stop(); }catch(e){}
-  try{ if(zxingReader&&zxingReader.reset) zxingReader.reset(); }catch(e){}
-  zxingControls=null; zxingReader=null;
+  if(rafId){ clearTimeout(rafId); rafId=0; }
+  detector=null;
   try{ if(video.srcObject){ video.srcObject.getTracks().forEach(function(t){ t.stop(); }); } }catch(e){}
   try{ video.srcObject=null; }catch(e){}
   video.style.transform='';
@@ -431,7 +426,7 @@ function setupZoom(){
     slider.min=caps.zoom.min; slider.max=caps.zoom.max; slider.step=caps.zoom.step||0.1;
     var cur=1; try{ cur=track.getSettings().zoom||caps.zoom.min; }catch(e){ cur=caps.zoom.min; }
     slider.value=cur;
-    slider.oninput=function(){ try{ track.applyConstraints({advanced:[{zoom:parseFloat(slider.value)}]}); }catch(e){} };
+    slider.oninput=function(){ try{ var z=track.applyConstraints({advanced:[{zoom:parseFloat(slider.value)}]}); if(z&&z.catch) z.catch(function(){}); }catch(e){} };
     row.classList.add('on');
   } else {
     // digital fallback (visual only)
@@ -448,7 +443,7 @@ function setupTorch(){
     var caps=track&&track.getCapabilities?track.getCapabilities():{};
     if(caps && caps.torch){
       b.classList.remove('hidden'); var on=false;
-      b.onclick=function(){ on=!on; try{ track.applyConstraints({advanced:[{torch:on}]}); }catch(e){}
+      b.onclick=function(){ on=!on; try{ var tc=track.applyConstraints({advanced:[{torch:on}]}); if(tc&&tc.catch) tc.catch(function(){}); }catch(e){}
         b.style.background=on?'var(--gold)':'var(--line-soft)'; b.style.color=on?'#3a2800':'var(--grey)'; };
     } else { b.classList.add('hidden'); }
   }catch(e){ b.classList.add('hidden'); }
