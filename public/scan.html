@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prafulla's Barcode Scanner</title>
+<meta name="description" content="Scan barcodes with your phone camera and send the values to Excel, Baserow, or any webhook. RD Life Sciences.">
+<link rel="icon" type="image/svg+xml" href="assets/rdl-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Open+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-900:#081d45; --navy:#0d2a61; --blue:#133c8b; --blue-300:#5b7fc0;
+    --green:#72bf44; --gold:#f0a500; --grey:#6d6e71; --ink:#231f20;
+    --paper:#f4f6fa; --card:#ffffff; --line:#e5e8f0; --line-soft:#eef1f6;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Open Sans',-apple-system,Segoe UI,Roboto,Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* Top bar */
+  .topbar{position:relative; background:#fff; padding:0 20px; height:56px;
+    display:flex; align-items:center; justify-content:flex-end; z-index:6;}
+  .logo-plate{position:absolute; top:0; left:18px; background:#fff;
+    border-radius:0 0 16px 16px; padding:12px 22px 15px;
+    box-shadow:0 18px 34px -18px rgba(8,29,69,.55); z-index:5;}
+  .logo-plate img{height:52px; width:auto; display:block;}
+  .nav-link{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--grey);
+    text-decoration:none; display:flex; align-items:center; gap:7px;}
+  .nav-link:hover{color:var(--blue);}
+
+  .hero{background:var(--navy); background-image:linear-gradient(160deg,var(--navy),var(--navy-900));
+    color:#eaf0fb; padding:26px 20px 20px; text-align:center;}
+  .hero h1{font-family:'Montserrat',sans-serif; font-weight:800; font-size:clamp(22px,6vw,30px);
+    margin:0 0 6px; letter-spacing:-.01em;}
+  .hero h1 .accent{color:var(--gold);}
+  .hero p{margin:0 auto; max-width:440px; color:#aeb9d6; font-size:14px; line-height:1.55;}
+
+  .wrap{max-width:640px; margin:0 auto; padding:18px 16px 60px;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 24px 48px -34px rgba(8,29,69,.4); overflow:hidden; margin-bottom:16px;}
+
+  /* Scanner */
+  .scanner{position:relative; background:#000; aspect-ratio:4/3; display:flex;
+    align-items:center; justify-content:center;}
+  .scanner video{width:100%; height:100%; object-fit:cover; display:block;}
+  .scanner .placeholder{position:absolute; color:#8aa; font-size:13.5px; text-align:center; padding:20px;
+    font-family:'JetBrains Mono',monospace; line-height:1.6;}
+  .reticle{position:absolute; inset:14% 10%; border:2px solid rgba(240,165,0,.9);
+    border-radius:14px; box-shadow:0 0 0 100vmax rgba(0,0,0,.28); pointer-events:none; display:none;}
+  .reticle.on{display:block;}
+  .scan-line{position:absolute; left:0; right:0; height:2px; background:var(--gold);
+    box-shadow:0 0 8px 1px rgba(240,165,0,.8); animation:sweep 2s linear infinite;}
+  @keyframes sweep{0%{top:4%;}50%{top:96%;}100%{top:4%;}}
+
+  .controls{padding:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .btn{flex:1; min-width:130px; border:none; border-radius:11px; padding:14px 16px;
+    font-family:'Open Sans',sans-serif; font-size:15px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px; transition:filter .15s ease;}
+  .btn:hover{filter:brightness(1.05);}
+  .btn-primary{background:var(--gold); color:#3a2800;}
+  .btn-stop{background:var(--navy); color:#fff;}
+  .btn-ghost{flex:0 0 auto; min-width:0; background:var(--line-soft); color:var(--grey); font-size:13px; padding:12px 14px;}
+  .btn-ghost:hover{color:var(--blue);}
+  .btn[disabled]{opacity:.5; cursor:not-allowed; filter:none;}
+
+  .status{padding:0 16px 14px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--grey);}
+  .status b{color:var(--green);}
+
+  /* Section headers */
+  .sec-head{display:flex; align-items:center; justify-content:space-between; padding:16px 16px 0;}
+  .sec-head h2{font-family:'Montserrat',sans-serif; font-size:14px; font-weight:700; color:var(--navy); margin:0;}
+  .count{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--grey);}
+
+  /* History */
+  .rows{padding:10px 16px 4px;}
+  .empty{color:var(--grey); font-size:13.5px; padding:14px 0 18px; text-align:center;}
+  .row{display:flex; align-items:flex-start; gap:10px; padding:11px 0; border-bottom:1px solid var(--line-soft);}
+  .row:last-child{border-bottom:none;}
+  .row .val{flex:1; min-width:0; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--ink);
+    word-break:break-all; line-height:1.4;}
+  .row .meta{font-size:11px; color:var(--grey); margin-top:3px; font-family:'JetBrains Mono',monospace;}
+  .row .gs1{margin-top:4px; font-size:11.5px; color:var(--blue); line-height:1.5;}
+  .row .gs1 span{color:var(--gold);}
+  .row .st{flex:0 0 auto; font-size:15px; line-height:1.4;}
+  .row .del{flex:0 0 auto; background:none; border:none; color:var(--grey); cursor:pointer; font-size:15px; padding:0 2px;}
+  .row .del:hover{color:#c0392b;}
+
+  .foot-actions{display:flex; gap:10px; padding:12px 16px 16px; flex-wrap:wrap;}
+  .foot-actions .btn{flex:1;}
+  .btn-export{background:var(--green); color:#0e2c05;}
+  .btn-clear{background:var(--line-soft); color:var(--grey);}
+
+  /* Destination settings */
+  .set{padding:14px 16px 18px;}
+  .set label{display:block; font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--grey); margin:12px 0 6px;}
+  .set label:first-child{margin-top:0;}
+  .set select, .set input{width:100%; padding:11px 12px; font-size:14px; font-family:'Open Sans',sans-serif;
+    color:var(--ink); background:#fbfbfc; border:1.5px solid var(--line); border-radius:9px; outline:none;}
+  .set input:focus, .set select:focus{border-color:var(--blue); background:#fff;}
+  .set .hint{font-size:12px; color:var(--grey); line-height:1.5; margin:8px 0 0;}
+  .set .hint code{font-family:'JetBrains Mono',monospace; background:var(--line-soft); color:var(--blue);
+    padding:1px 5px; border-radius:4px; font-size:11.5px;}
+  .hidden{display:none;}
+  .save-note{font-size:12px; color:var(--green); margin:8px 0 0; font-family:'JetBrains Mono',monospace; display:none;}
+
+  footer{text-align:center; padding:18px 20px 34px; color:var(--grey); font-size:12px;}
+  footer .brand{color:var(--blue); font-weight:600;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-plate"><img src="assets/rdl-logo.svg" alt="RD Life Sciences"></div>
+  <a class="nav-link" href="/">Generator &rarr;</a>
+</div>
+
+<div class="hero">
+  <h1 class="mont">Barcode <span class="accent">Scanner</span></h1>
+  <p>Point your camera at a barcode. Values are saved here and can be sent to Excel, Baserow, or any webhook.</p>
+</div>
+
+<div class="wrap">
+
+  <!-- Scanner -->
+  <div class="card">
+    <div class="scanner">
+      <video id="video" playsinline muted></video>
+      <div class="reticle" id="reticle"><div class="scan-line"></div></div>
+      <div class="placeholder" id="placeholder">Camera is off.<br>Tap &ldquo;Start camera&rdquo; below.</div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">Start camera</button>
+      <button class="btn btn-stop hidden" id="stopBtn">Stop</button>
+      <button class="btn-ghost btn" id="torchBtn" title="Toggle flashlight" style="display:none;">Torch</button>
+    </div>
+    <div class="status" id="status">Ready.</div>
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <div class="sec-head">
+      <h2>Scans</h2>
+      <span class="count" id="count">0</span>
+    </div>
+    <div class="rows" id="rows"><div class="empty">No scans yet.</div></div>
+    <div class="foot-actions">
+      <button class="btn btn-export" id="exportBtn">Export CSV</button>
+      <button class="btn btn-clear" id="clearBtn">Clear all</button>
+    </div>
+  </div>
+
+  <!-- Destination -->
+  <div class="card">
+    <div class="sec-head"><h2>Where scans go</h2></div>
+    <div class="set">
+      <label for="dest">Destination</label>
+      <select id="dest">
+        <option value="local">This device only (export CSV to Excel)</option>
+        <option value="webhook">Send each scan to a webhook / API URL</option>
+      </select>
+
+      <div id="webhookBox" class="hidden">
+        <label for="webhookUrl">Webhook / API URL (POST)</label>
+        <input id="webhookUrl" type="url" placeholder="https://barcode.drprafulla.com/api/save" autocomplete="off">
+        <p class="hint">Each scan is POSTed as JSON: <code>{ "value", "format", "timestamp" }</code>.
+        Point this at <code>/api/save</code> (included Baserow bridge), a Google Sheets Apps Script URL, or any automation webhook (Make, n8n, Zapier).</p>
+        <label for="autoSend" style="display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; font-size:13px; color:var(--ink); cursor:pointer;">
+          <input type="checkbox" id="autoSend" style="width:auto;" checked> Send automatically on each scan
+        </label>
+      </div>
+      <p class="save-note" id="saveNote">Saved.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span class="brand">Prafulla&rsquo;s Barcode Scanner</span> &middot; RD Life Sciences
+</footer>
+
+<script>
+/* ---------- storage ---------- */
+var LS_HISTORY = 'rdl_scan_history';
+var LS_DEST    = 'rdl_scan_dest';
+
+function loadHistory(){ try { return JSON.parse(localStorage.getItem(LS_HISTORY) || '[]'); } catch(e){ return []; } }
+function saveHistory(h){ try { localStorage.setItem(LS_HISTORY, JSON.stringify(h.slice(0,500))); } catch(e){} }
+function loadDest(){ try { return JSON.parse(localStorage.getItem(LS_DEST) || '{}'); } catch(e){ return {}; } }
+function saveDest(d){ try { localStorage.setItem(LS_DEST, JSON.stringify(d)); } catch(e){} }
+
+var scans = loadHistory();
+var dest = loadDest();
+
+/* ---------- GS1 AI parsing (best-effort, common AIs) ---------- */
+var AI_FIXED = { '00':18,'01':14,'02':14,'11':6,'12':6,'13':6,'15':6,'16':6,'17':6,'20':2 };
+var AI_NAME = { '00':'SSCC','01':'GTIN','02':'GTIN','10':'Batch/Lot','11':'Prod date','12':'Due date',
+  '13':'Pack date','15':'Best before','16':'Sell by','17':'Expiry','20':'Variant','21':'Serial',
+  '240':'Add-on ID','241':'Cust part','30':'Count','37':'Count','400':'Order no','410':'Ship to' };
+function parseGS1(raw){
+  if (!raw) return null;
+  // Normalize FNC1/GS separators to a marker
+  var s = raw.replace(/[\x1d\x1e]/g,'\u001d');
+  // Some engines prefix an AIM symbology identifier (e.g. ]C1, ]e0, ]d2, ]Q3). Strip known GS1 ones.
+  s = s.replace(/^\](?:C1|e[0-9]|d2|Q3|Q1)/, '');
+  // Only attempt if it looks like it starts with a known AI
+  var startAI2 = s.substr(0,2), startAI3 = s.substr(0,3);
+  if (!(AI_FIXED[startAI2] || AI_NAME[startAI2] || AI_NAME[startAI3])) return null;
+  var out = [], i = 0, guard = 0;
+  while (i < s.length && guard++ < 30){
+    if (s[i] === '\u001d'){ i++; continue; }
+    var ai = null, len = null;
+    // try 2-digit AI first, then 3
+    var a2 = s.substr(i,2), a3 = s.substr(i,3);
+    if (AI_FIXED[a2] !== undefined){ ai = a2; len = AI_FIXED[a2]; i += 2; }
+    else if (AI_NAME[a2]){ ai = a2; i += 2; }        // variable 2-digit
+    else if (AI_NAME[a3]){ ai = a3; i += 3; }         // variable 3-digit
+    else { break; }
+    var val;
+    if (len !== null){ val = s.substr(i, len); i += len; }
+    else { // variable: read up to next GS or end
+      var gs = s.indexOf('\u001d', i);
+      if (gs === -1){ val = s.substr(i); i = s.length; } else { val = s.substring(i, gs); i = gs; }
+    }
+    out.push({ ai: ai, name: AI_NAME[ai] || 'AI '+ai, value: val });
+  }
+  return out.length ? out : null;
+}
+function gs1Html(parts){
+  return parts.map(function(p){ return '<span>('+p.ai+')</span> '+p.name+': '+escapeHtml(p.value); }).join('<br>');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ---------- render scans ---------- */
+function render(){
+  var rows = document.getElementById('rows');
+  document.getElementById('count').textContent = scans.length;
+  if (!scans.length){ rows.innerHTML = '<div class="empty">No scans yet.</div>'; return; }
+  rows.innerHTML = '';
+  scans.forEach(function(item, idx){
+    var div = document.createElement('div'); div.className = 'row';
+    var st = item.status === 'sent' ? '<span class="st" title="Sent">\u2705</span>'
+           : item.status === 'failed' ? '<span class="st" title="Send failed">\u26a0\ufe0f</span>' : '';
+    var gs1 = item.gs1 ? '<div class="gs1">'+gs1Html(item.gs1)+'</div>' : '';
+    var t = new Date(item.timestamp);
+    var ts = t.toLocaleString();
+    div.innerHTML =
+      '<div class="val">'+escapeHtml(item.value)+
+        gs1 +
+        '<div class="meta">'+escapeHtml(item.format)+' &middot; '+ts+'</div>'+
+      '</div>'+ st +
+      '<button class="del" data-i="'+idx+'" title="Delete">\u00d7</button>';
+    rows.appendChild(div);
+  });
+  Array.prototype.forEach.call(rows.querySelectorAll('.del'), function(b){
+    b.addEventListener('click', function(){ var i = +this.getAttribute('data-i'); scans.splice(i,1); saveHistory(scans); render(); });
+  });
+}
+
+/* ---------- add a scan ---------- */
+var lastValue = '', lastTime = 0;
+function addScan(value, format){
+  var now = Date.now();
+  if (value === lastValue && (now - lastTime) < 2500) return; // debounce repeats
+  lastValue = value; lastTime = now;
+  beep(); if (navigator.vibrate) navigator.vibrate(80);
+  var item = { value:value, format:format||'unknown', timestamp:new Date().toISOString(), gs1: parseGS1(value), status:'' };
+  scans.unshift(item); saveHistory(scans); render();
+  var d = readDestForm();
+  if (d.mode === 'webhook' && d.url && d.autoSend) sendOne(item, d.url);
+}
+
+/* ---------- send to webhook ---------- */
+function sendOne(item, url){
+  var payload = { value:item.value, format:item.format, timestamp:item.timestamp };
+  if (item.gs1) payload.gs1 = item.gs1;
+  fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+    .then(function(r){ item.status = r.ok ? 'sent' : 'failed'; saveHistory(scans); render(); })
+    .catch(function(){ item.status = 'failed'; saveHistory(scans); render(); });
+}
+
+/* ---------- beep ---------- */
+var audioCtx;
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, audioCtx.currentTime+.15);
+    o.start(); o.stop(audioCtx.currentTime+.15);
+  }catch(e){}
+}
+
+/* ---------- camera + detection ----------
+   Engine strategy for full coverage on BOTH Android and iPhone:
+   - Android Chrome: native BarcodeDetector (fast). But only if it reports the
+     critical formats; some devices' ML Kit build lacks pdf417/data_matrix.
+   - iPhone/Safari (no BarcodeDetector) OR incomplete native support:
+     ZXing (loaded from CDN) with ALL formats forced on + TRY_HARDER.
+*/
+var video = document.getElementById('video');
+var stream = null, running = false, detector = null, zxingReader = null, track = null, engine = '';
+
+var WANT = ['code_128','ean_13','ean_8','upc_a','upc_e','qr_code','data_matrix','itf','code_39','code_93','pdf417','codabar','aztec'];
+var CRITICAL = ['qr_code','code_128','ean_13','data_matrix','pdf417']; // if native lacks any, use ZXing
+
+async function nativeUsable(){
+  if (!('BarcodeDetector' in window)) return null;
+  var formats = null;
+  try { formats = await window.BarcodeDetector.getSupportedFormats(); } catch(e){ return null; }
+  if (!formats || !formats.length) return null;
+  for (var k=0;k<CRITICAL.length;k++){ if (formats.indexOf(CRITICAL[k])<0) return null; }
+  return WANT.filter(function(f){ return formats.indexOf(f)>=0; });
+}
+
+async function startCamera(){
+  showLive(true);
+  try{
+    var use = await nativeUsable();
+    if (use){
+      await startNative(use);
+    } else {
+      await startZxing();
+    }
+  }catch(err){
+    onCamError(err);
+  }
+}
+
+/* --- Native BarcodeDetector path (Android) --- */
+async function startNative(formats){
+  setStatus('Requesting camera\u2026');
+  stream = await navigator.mediaDevices.getUserMedia({
+    video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:1280} }
+  });
+  video.setAttribute('playsinline','true'); video.srcObject = stream; await video.play();
+  track = stream.getVideoTracks()[0];
+  try { if (track.applyConstraints) track.applyConstraints({ advanced:[{ focusMode:'continuous' }] }); } catch(e){}
+  setupTorch();
+  detector = new window.BarcodeDetector({ formats: formats });
+  engine = 'native';
+  running = true;
+  setStatus('Scanning\u2026');
+  loopNative();
+}
+async function loopNative(){
+  if (!running) return;
+  try{
+    var codes = await detector.detect(video);
+    if (codes && codes.length){ addScan(codes[0].rawValue, fmtName(codes[0].format)); }
+  }catch(e){ /* transient decode frame error */ }
+  requestAnimationFrame(loopNative);
+}
+
+/* --- ZXing path (iPhone/Safari, or incomplete native) --- */
+function loadScript(src){
+  return new Promise(function(resolve,reject){
+    var s=document.createElement('script'); s.src=src;
+    s.onload=resolve; s.onerror=function(){ reject(new Error('load failed')); };
+    document.head.appendChild(s);
+  });
+}
+async function startZxing(){
+  setStatus('Loading scanner\u2026');
+  if (typeof ZXing === 'undefined'){
+    try { await loadScript('https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js'); }
+    catch(e){ setStatus('Could not load the scanner. Check your connection and retry.'); showLive(false); return; }
+  }
+  try{
+    var hints = new Map();
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    var F = ZXing.BarcodeFormat;
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      F.QR_CODE, F.DATA_MATRIX, F.AZTEC, F.PDF_417,
+      F.CODE_128, F.CODE_39, F.CODE_93, F.CODABAR, F.ITF,
+      F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.RSS_14, F.RSS_EXPANDED
+    ]);
+    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+    engine = 'zxing';
+    running = true;
+    // Let ZXing own the camera (most reliable on iOS): it will call getUserMedia.
+    video.setAttribute('playsinline','true');
+    await zxingReader.decodeFromConstraints(
+      { video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:1280} } },
+      video,
+      function(result, err){
+        if (result){
+          var fmt = 'barcode';
+          try { fmt = ZXing.BarcodeFormat[result.getBarcodeFormat()] || 'barcode'; } catch(e){}
+          addScan(result.getText(), fmtName(fmt));
+        }
+      }
+    );
+    // grab the track (for torch, if any) from the element ZXing set up
+    try { stream = video.srcObject; track = stream && stream.getVideoTracks()[0]; setupTorch(); } catch(e){}
+    setStatus('Scanning\u2026');
+  }catch(err){ onCamError(err); }
+}
+
+function onCamError(err){
+  running = false;
+  var msg = (err && err.message) ? err.message : String(err);
+  setStatus('Camera error: ' + msg);
+  document.getElementById('placeholder').style.display='block';
+  document.getElementById('placeholder').innerHTML =
+    'Could not start the camera.<br>Allow camera access, use https, and on iPhone use Safari.';
+  document.getElementById('reticle').classList.remove('on');
+  document.getElementById('startBtn').classList.remove('hidden');
+  document.getElementById('stopBtn').classList.add('hidden');
+}
+
+function showLive(on){
+  document.getElementById('placeholder').style.display = on ? 'none' : 'block';
+  document.getElementById('reticle').classList.toggle('on', on);
+  document.getElementById('startBtn').classList.toggle('hidden', on);
+  document.getElementById('stopBtn').classList.toggle('hidden', !on);
+  if (on) setStatus('Starting\u2026');
+}
+
+function stopCamera(){
+  running = false;
+  try{ if (zxingReader){ zxingReader.reset(); zxingReader = null; } }catch(e){}
+  if (stream){ try{ stream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){} stream = null; }
+  if (video){ try{ video.srcObject = null; }catch(e){} }
+  track = null;
+  document.getElementById('reticle').classList.remove('on');
+  document.getElementById('placeholder').style.display='block';
+  document.getElementById('placeholder').innerHTML='Camera is off.<br>Tap &ldquo;Start camera&rdquo; below.';
+  document.getElementById('startBtn').classList.remove('hidden');
+  document.getElementById('stopBtn').classList.add('hidden');
+  document.getElementById('torchBtn').style.display='none';
+  setStatus('Stopped.');
+}
+
+/* torch (Android mainly; iOS Safari doesn't expose it) */
+function setupTorch(){
+  try{
+    if (!track || !track.getCapabilities) return;
+    var cap = track.getCapabilities();
+    if (cap && cap.torch){
+      var b = document.getElementById('torchBtn'); b.style.display='inline-flex'; var on=false;
+      b.onclick = function(){ on=!on; try{ track.applyConstraints({advanced:[{torch:on}]}); }catch(e){}
+        b.style.background = on ? 'var(--gold)' : 'var(--line-soft)'; b.style.color = on ? '#3a2800':'var(--grey)'; };
+    }
+  }catch(e){}
+}
+
+function fmtName(f){ return (f||'barcode').toString().replace(/_/g,' ').toLowerCase(); }
+function setStatus(t){ document.getElementById('status').innerHTML = t; }
+
+/* ---------- CSV export ---------- */
+function exportCSV(){
+  if (!scans.length){ setStatus('Nothing to export yet.'); return; }
+  var rows = [['value','format','timestamp']];
+  scans.slice().reverse().forEach(function(i){ rows.push([i.value, i.format, i.timestamp]); });
+  var csv = rows.map(function(r){ return r.map(function(c){
+    c = String(c==null?'':c); return /[",\n]/.test(c) ? '"'+c.replace(/"/g,'""')+'"' : c; }).join(','); }).join('\r\n');
+  var blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'scans-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* ---------- destination form ---------- */
+function readDestForm(){
+  return { mode: document.getElementById('dest').value,
+           url: document.getElementById('webhookUrl').value.trim(),
+           autoSend: document.getElementById('autoSend').checked };
+}
+function applyDestUI(){
+  var mode = document.getElementById('dest').value;
+  document.getElementById('webhookBox').classList.toggle('hidden', mode !== 'webhook');
+}
+function persistDest(){
+  var d = readDestForm(); saveDest(d);
+  var n = document.getElementById('saveNote'); n.style.display='block';
+  setTimeout(function(){ n.style.display='none'; }, 1200);
+}
+
+/* ---------- wire up ---------- */
+document.getElementById('startBtn').addEventListener('click', startCamera);
+document.getElementById('stopBtn').addEventListener('click', stopCamera);
+document.getElementById('exportBtn').addEventListener('click', exportCSV);
+document.getElementById('clearBtn').addEventListener('click', function(){
+  if (confirm('Clear all scans on this device?')){ scans = []; saveHistory(scans); render(); }
+});
+document.getElementById('dest').addEventListener('change', function(){ applyDestUI(); persistDest(); });
+document.getElementById('webhookUrl').addEventListener('change', persistDest);
+document.getElementById('autoSend').addEventListener('change', persistDest);
+
+/* restore dest */
+if (dest.mode){ document.getElementById('dest').value = dest.mode; }
+if (dest.url){ document.getElementById('webhookUrl').value = dest.url; }
+if (typeof dest.autoSend === 'boolean'){ document.getElementById('autoSend').checked = dest.autoSend; }
+applyDestUI();
+render();
+</script>
+</body>
+</html>

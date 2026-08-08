@@ -91,3 +91,54 @@ npx esbuild node_modules/bwip-js/dist/bwip-js-node.mjs --bundle --minify \
   --external:url --external:zlib --external:stream \
   --outfile=functions/api/vendor-bwipjs.mjs
 ```
+
+---
+
+# Barcode Scanner (phone camera)
+
+A second page, `public/scan.html`, served at `/scan` (e.g.
+`https://barcode.drprafulla.com/scan`). Open it on a phone, tap **Start
+camera**, and point at a barcode. It reads Code 128 / GS1-128, QR, EAN/UPC,
+Data Matrix, ITF and more.
+
+- Uses the browser's native **BarcodeDetector** (Chrome/Android — great on
+  Samsung), with a **ZXing** fallback loaded on demand for iOS/Safari.
+- Scans are kept in a list on the device (localStorage), with best-effort
+  **GS1 Application Identifier** parsing shown per scan (splits `(01)`, `(15)`,
+  `(10)`, etc.).
+- **Export CSV** opens straight in Excel.
+- **Send each scan** to a destination you choose (see below).
+- Requires HTTPS for camera access — Cloudflare Pages provides that.
+
+## Sending scans to Baserow (secure bridge)
+
+`functions/api/save.js` forwards a scan to Baserow using a **server-side**
+token, so nothing secret sits in the page. In the scanner's "Where scans go"
+box, choose **webhook** and enter `https://barcode.drprafulla.com/api/save`.
+
+Then set these in Cloudflare: your Pages project -> **Settings ->
+Environment variables** (mark the token as a Secret):
+
+    BASEROW_TOKEN      your Baserow database API token   (required)
+    BASEROW_TABLE_ID   the numeric table id              (required)
+    BASEROW_URL        base url, default https://api.baserow.io   (optional; set for self-hosted)
+    FIELD_VALUE        column for the code,  default "Value"       (optional)
+    FIELD_FORMAT       column for the type,  default "Format"      (optional)
+    FIELD_TIME         column for the time,  default "Scanned At"  (optional)
+
+Your Baserow table needs at least a text field named to match `FIELD_VALUE`
+("Value" by default). Redeploy after setting the variables.
+
+## Sending scans elsewhere (no coding)
+
+The webhook posts JSON `{ value, format, timestamp, gs1? }`, so you can point it
+at anything that accepts a POST:
+
+- **Google Sheets**: create an Apps Script bound to a sheet with a `doPost(e)`
+  that appends a row, deploy as a Web App ("Anyone"), and paste that URL.
+- **Make / n8n / Zapier**: paste the automation's inbound webhook URL.
+
+## Local only (no backend)
+
+Leave the destination on **This device only** and just use **Export CSV** —
+the simplest path if you only need the values in Excel.
